@@ -1,0 +1,33 @@
+# Python bytecode / caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Secrets
+.env
+.env.*
+
+# Harness run artifacts
+*.db
+*.sqlite
+*.sqlite3
+ai_exchange/
+harness_input_*.json
+harness_run_*/
+
+# Machine-specific configs (keep the shared harness_config.json / template tracked)
+*.local.json
+
+# Editor / OS clutter
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+.DS_Store

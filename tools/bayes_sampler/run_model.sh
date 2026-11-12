@@ -15,9 +15,17 @@ mkdir -p "$OUTPUT_DIR"
 SAMPLES_OUT="$OUTPUT_DIR/samples_${SCENARIO_ID}.json"
 SUMMARY_OUT="$OUTPUT_DIR/summary_${SCENARIO_ID}.json"
 
+# Newer headless_sampler.js versions take an extra MITRE attack-group argument:
+#   <net> <n> <fixedNodes> <mitreGroup> <samplesOut> <summaryOut>
+# Older versions omit it. Detect which one we're calling.
+OPTIONAL_ARGS=("NA")
+if grep -q "mitreAttackGroupFilePath" "$SAMPLER_PATH"; then
+    OPTIONAL_ARGS=("NA" "NA")
+fi
+
 node "$SAMPLER_PATH" \
     "$INPUT_JSON" \
     "$N_SAMPLES" \
-    "NA" \
+    "${OPTIONAL_ARGS[@]}" \
     "$SAMPLES_OUT" \
     "$SUMMARY_OUT"

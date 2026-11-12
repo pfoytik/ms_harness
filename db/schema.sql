@@ -40,6 +40,14 @@ CREATE TABLE IF NOT EXISTS findings (
     created_at   TEXT    NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS ai_outputs (
+    ai_output_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sweep_id     INTEGER REFERENCES sweeps(sweep_id),
+    kind         TEXT    NOT NULL,  -- 'interpretation', 'proposal'
+    content      TEXT    NOT NULL,
+    created_at   TEXT    NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_inputs_scenario  ON inputs(scenario_id);
 CREATE INDEX IF NOT EXISTS idx_outputs_scenario ON outputs(scenario_id);
 CREATE INDEX IF NOT EXISTS idx_scenarios_sweep  ON scenarios(sweep_id);

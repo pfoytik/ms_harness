@@ -51,12 +51,18 @@
     "_comment_quantile": "0.5 = bottom half of outcomes is 'critical'. Lower values narrow the critical set; higher values broaden it.",
     "critical_threshold_quantile": 0.5,
 
+    "_comment_threshold": "Optional. Fixed critical threshold in the metric's own units (e.g. 20 = resilience <= 20% is critical). If omitted, the threshold is the critical_threshold_quantile of the FIRST LHS sweep and stays fixed for later targeted sweeps.",
+    "critical_threshold": null,
+
     "surprise_definition": "What would it mean for a critical scenario to be surprising? Describe the combination of inputs that would be unexpected given domain knowledge.",
 
-    "_comment_potential": "How should node importance be measured? Options: 'paths_to_exit' (topological — fraction of source-to-exit paths through each node), 'betweenness' (graph centrality), 'likelihood' (mean LHS weight — use when there is no graph structure).",
+    "_comment_potential": "How should node importance be measured? Options: 'paths_to_exit' (topological — fraction of source-to-exit paths through each node), 'betweenness' (graph centrality), 'likelihood' (mean LHS weight — use when there is no graph structure), 'sme' (the nodes listed in sme_expected_drivers — critical scenarios WITHOUT those drivers elevated score as surprising, i.e. surprise = contradicting the SME).",
     "element_potential": "paths_to_exit",
 
-    "sme_context": "Summarize what you already know about this system: which inputs are high-impact, what failure modes are already understood, and what surprises you are trying to find. This context is given to the AI for every interpretation."
+    "_comment_drivers": "Optional. Input ids the SME expects to drive critical outcomes, as a list or {id: importance}. Required for element_potential 'sme'; otherwise shown to the AI and used to flag, per top scenario, which expected drivers were elevated.",
+    "sme_expected_drivers": [],
+
+    "sme_context": "Summarize what you already know about this system: which inputs are high-impact, what failure modes are already understood, and what surprises you are trying to find. This is placed in the AI's system preamble for every interpretation, proposal and chat — framed as the SME's prior expectations to be tested, not as fact."
   },
 
   "sampling": {

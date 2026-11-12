@@ -35,6 +35,7 @@ from core import store, planner, runner, analyzer
 from core.conversation import (
     OnboardingSession,
     interpret_findings, propose_next_sweep,
+    ai_available, build_preamble, _report_block,
 )
 
 console = Console()
@@ -49,6 +50,17 @@ BANNER = """[bold cyan]
 def _load_config(config_path: str) -> dict:
     with open(config_path) as f:
         return json.load(f)
+
+
+DB_DIR = Path(__file__).parent / "db"
+
+
+def _resolve_db(db: str) -> str:
+    """A bare filename (e.g. 'demo.db') lives in db/; any path with a directory is used as given."""
+    if "/" not in db and os.sep not in db:
+        DB_DIR.mkdir(exist_ok=True)
+        return str(DB_DIR / db)
+    return db
 
 
 def _load_input_specs(config: dict) -> list[dict]:
@@ -74,7 +86,12 @@ def _print_findings(report: dict) -> None:
     t.add_column("Metric", style="dim")
     t.add_column("Value")
     t.add_row("Scenarios analyzed",  str(report["n_scenarios"]))
-    t.add_row("Critical (τ)",        f"{report['n_critical']}  (τ = {report['tau']:.1f})")
+    if "tau_raw" in report:
+        op = "≤" if report.get("direction") == "below" else "≥"
+        t.add_row("Critical",        f"{report['n_critical']}  ({report['metric']} {op} "
+                                     f"{report['tau_raw']:.1f}; {report['tau_source']})")
+    else:  # findings saved before tau_raw existed
+        t.add_row("Critical (τ)",    f"{report['n_critical']}  (τ = {report['tau']:.1f})")
     t.add_row("Z̄ (mean surprise)",   f"{report['z_bar']:.3f}")
     t.add_row("Box size",            str(report["n_in_box"]))
     t.add_row("Precision",           f"{report['precision']:.1%}")
@@ -115,17 +132,24 @@ def _print_findings(report: dict) -> None:
         console.print(st)
 
 
-def _ai_interpret(report: dict, config: dict) -> dict | None:
-    """Call Claude for findings interpretation. Returns proposal or None."""
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        console.print("[dim]  (ANTHROPIC_API_KEY not set — skipping AI interpretation)[/dim]")
+def _ai_interpret(report: dict, config: dict, db: str, final: bool) -> dict | None:
+    """Call Claude for findings interpretation (+ next-sweep proposal unless final).
+    Both outputs are stored in the DB. Returns the proposal or None."""
+    if not ai_available():
+        console.print("[dim]  (ANTHROPIC_API_KEY not set and HARNESS_AI_MODE != manual — skipping AI interpretation)[/dim]")
         return None
     try:
         console.print("[dim]  Asking AI for interpretation...[/dim]")
         interpretation = interpret_findings(report, config)
+        store.save_ai_output(db, report["sweep_id"], "interpretation", interpretation)
         console.print(Panel(interpretation, title="[bold cyan]AI Interpretation[/bold cyan]",
                              border_style="cyan", box=rbox.ROUNDED))
-        proposal = propose_next_sweep(report, config)
+        if final:
+            return None
+        proposal = propose_next_sweep(report, config, interpretation)
+        store.save_ai_output(db, report["sweep_id"], "proposal", json.dumps(proposal))
+        if proposal.get("rationale"):
+            console.print(f"[dim]  AI proposal: {proposal['rationale']}[/dim]")
         return proposal
     except Exception as exc:
         console.print(f"[yellow]  AI interpretation failed: {exc}[/yellow]")
@@ -141,12 +165,13 @@ def cli():
 
 @cli.command()
 @click.option("--config", required=True, help="Path to harness_config.json")
-@click.option("--db",     required=True, help="Path to SQLite samples DB (created if absent)")
+@click.option("--db",     required=True, help="SQLite samples DB; a bare filename is stored in db/ (created if absent)")
 @click.option("--sweeps", default=3,     show_default=True,
               help="Maximum number of sweeps to run")
 @click.option("--no-ai",  is_flag=True,  help="Skip AI interpretation (run analysis only)")
 def run(config, db, sweeps, no_ai):
     """Run a sweep campaign: LHS → analyze → targeted follow-up loop."""
+    db = _resolve_db(db)
     console.print(BANNER)
     cfg = _load_config(config)
     store.init_db(db)
@@ -214,7 +239,7 @@ def run(config, db, sweeps, no_ai):
         # AI interpretation
         proposal = None
         if not no_ai:
-            proposal = _ai_interpret(report, cfg)
+            proposal = _ai_interpret(report, cfg, db, final=(sweep_num == sweeps))
 
         # Update box for next targeted sweep
         if report["box"]:
@@ -240,9 +265,10 @@ def run(config, db, sweeps, no_ai):
 
 @cli.command()
 @click.option("--config", required=True, help="Path to harness_config.json")
-@click.option("--db",     required=True, help="Path to SQLite samples DB")
+@click.option("--db",     required=True, help="SQLite samples DB; a bare filename is looked up in db/")
 def status(config, db):
     """Show DB summary for a project."""
+    db = _resolve_db(db)
     console.print(BANNER)
     cfg = _load_config(config)
     if not os.path.exists(db):
@@ -289,11 +315,12 @@ def status(config, db):
 
 @cli.command()
 @click.option("--config", required=True, help="Path to harness_config.json")
-@click.option("--db",     required=True, help="Path to SQLite samples DB")
+@click.option("--db",     required=True, help="SQLite samples DB; a bare filename is looked up in db/")
 def chat(config, db):
     """Open a conversation about current findings with the AI."""
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        console.print("[red]ANTHROPIC_API_KEY not set.[/red]")
+    db = _resolve_db(db)
+    if not ai_available():
+        console.print("[red]ANTHROPIC_API_KEY not set (or use HARNESS_AI_MODE=manual).[/red]")
         sys.exit(1)
 
     cfg     = _load_config(config)
@@ -303,12 +330,9 @@ def chat(config, db):
 
     from core.conversation import _call_claude
 
-    system = (
-        f"You are an AI assistant helping a modeling expert analyze results from a "
-        f"{cfg['tool']['name']} experiment. "
-        f"SME context: {cfg['objective'].get('sme_context', '')} "
-        + (f"Latest findings: {json.dumps(finding)}" if finding else "No runs yet.")
-    )
+    system = build_preamble(cfg, finding) + "\n\n" + (
+        "LATEST FINDINGS:\n" + _report_block(finding) if finding else "No runs yet."
+    ) + "\n\nAnswer the modeler's questions about these results."
     history = []
 
     console.print("[dim]Type your question. Enter 'quit' to exit.[/dim]\n")
@@ -328,8 +352,8 @@ def chat(config, db):
               help="Output path for generated config")
 def new(output):
     """Start onboarding conversation to generate a new harness_config.json."""
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        console.print("[red]ANTHROPIC_API_KEY required for onboarding.[/red]")
+    if not ai_available():
+        console.print("[red]ANTHROPIC_API_KEY required for onboarding (or HARNESS_AI_MODE=manual).[/red]")
         console.print("Copy and edit tools/bayes_sampler/harness_config.json as a template.")
         sys.exit(1)
 

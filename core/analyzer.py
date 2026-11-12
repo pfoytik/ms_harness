@@ -11,7 +11,7 @@ import networkx as nx
 import numpy as np
 from scipy.stats import chi2_contingency
 
-from .store import load_sweep_data, load_all_data
+from .store import load_sweep_data, load_all_data, first_lhs_sweep_id
 
 
 # ── Element potentials ────────────────────────────────────────────────────────
@@ -59,6 +59,29 @@ def _likelihood_potential(X: np.ndarray, node_ids: list[str]) -> dict:
     return {nid: float(means[j] / total) for j, nid in enumerate(node_ids)}
 
 
+def _sme_drivers(config: dict) -> dict:
+    """objective.sme_expected_drivers as {node_id: importance}; a list means equal weights."""
+    raw = config["objective"].get("sme_expected_drivers") or {}
+    if isinstance(raw, list):
+        raw = {str(k): 1.0 for k in raw}
+    return {str(k): float(v) for k, v in raw.items()}
+
+
+def _sme_potential(config: dict, node_ids: list[str]) -> dict:
+    """
+    Potential = the SME's stated expectation of which nodes drive the critical
+    outcome. Low SP then means "the SME's expected drivers are NOT elevated",
+    so critical + low SP = a critical scenario that contradicts the SME.
+    """
+    drivers = _sme_drivers(config)
+    if not drivers:
+        raise ValueError("element_potential 'sme' requires objective.sme_expected_drivers")
+    unknown = set(drivers) - set(node_ids)
+    if unknown:
+        raise ValueError(f"sme_expected_drivers not among inputs: {sorted(unknown)}")
+    return {nid: drivers.get(nid, 0.0) for nid in node_ids}
+
+
 def _compute_potentials(potential_type: str, node_ids: list[str],
                          X: np.ndarray, config: dict) -> dict:
     if potential_type in ("betweenness", "paths_to_exit"):
@@ -69,6 +92,8 @@ def _compute_potentials(potential_type: str, node_ids: list[str],
         return _paths_to_exit_potential(G, node_ids)
     if potential_type == "likelihood":
         return _likelihood_potential(X, node_ids)
+    if potential_type == "sme":
+        return _sme_potential(config, node_ids)
     raise ValueError(f"Unknown potential_type: {potential_type!r}")
 
 
@@ -270,8 +295,31 @@ def analyze(sweep_id: int, db_path: str, config: dict,
         for sid in valid
     ])
 
-    # Critical label
-    tau           = float(np.quantile(y, tau_q))
+    # Critical label. tau is on the internal "higher = worse" scale y.
+    # It is frozen so targeted (deliberately biased) sweeps can't move it:
+    #   1. objective.critical_threshold (metric units), if set
+    #   2. else the tau_q quantile of the first completed LHS sweep
+    #   3. else (no LHS sweep yet) the quantile of the data being analyzed
+    explicit = config["objective"].get("critical_threshold")
+    if explicit is not None:
+        tau = (100.0 - float(explicit)) if direction == "below" else float(explicit)
+        tau_source = "config critical_threshold"
+    else:
+        base_id = first_lhs_sweep_id(db_path)
+        base_y  = None
+        if base_id is not None:
+            _, base_out = load_sweep_data(db_path, base_id)
+            vals = [r["value"] for r in base_out if r["metric"] == metric]
+            if vals:
+                base_raw = np.array(vals)
+                base_y   = (100.0 - base_raw) if direction == "below" else base_raw
+        if base_y is not None:
+            tau = float(np.quantile(base_y, tau_q))
+            tau_source = f"q{tau_q:g} of initial LHS sweep {base_id}"
+        else:
+            tau = float(np.quantile(y, tau_q))
+            tau_source = f"q{tau_q:g} of analyzed data"
+    tau_raw       = (100.0 - tau) if direction == "below" else tau
     critical_mask = y >= tau
 
     # Z scores
@@ -303,7 +351,13 @@ def analyze(sweep_id: int, db_path: str, config: dict,
     top_scenarios = []
     for idx in top_order:
         sid = valid[idx]
+        drivers = _sme_drivers(config)
+        extra = {}
+        if drivers:
+            extra["sme_drivers_elevated"] = sorted(
+                (d for d in drivers if inp_map[sid].get(d, 0.0) > nominal.get(d, 0.5)), key=str)
         top_scenarios.append({
+            **extra,
             "scenario_id": sid,
             "z_score":     float(Z[idx]),
             "sp":          float(sp_vals[idx]),
@@ -317,6 +371,8 @@ def analyze(sweep_id: int, db_path: str, config: dict,
         "n_critical":         int(critical_mask.sum()),
         "tau":                float(tau),
         "tau_quantile":       tau_q,
+        "tau_raw":            float(tau_raw),
+        "tau_source":         tau_source,
         "potential_type":     potential_type,
         "z_bar":              float(meta["z_bar"]),
         "n_in_box":           int(meta["n_in_box"]),
@@ -324,6 +380,7 @@ def analyze(sweep_id: int, db_path: str, config: dict,
         "bias_ratio":         br,
         "completeness_index": ci,
         "box":                box_description,
+        "potentials":         {k: round(float(v), 4) for k, v in potentials.items()},
         "top_surprising":     top_scenarios,
         "metric":             metric,
         "direction":          direction,
