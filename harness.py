@@ -73,6 +73,15 @@ def _resolve_db(db: str) -> str:
     return db
 
 
+def _lambda_for_sweep(config: dict, sweep_num: int) -> tuple[float, float]:
+    """Return (lambda1, lambda2) for this sweep from sampling.lambda_schedule.
+    The last entry is reused for any sweep beyond the schedule length.
+    Default schedule: pure severity on sweep 1, then balanced."""
+    schedule = config["sampling"].get("lambda_schedule", [[1.0, 0.0], [0.5, 1.0]])
+    pair = schedule[min(sweep_num - 1, len(schedule) - 1)]
+    return float(pair[0]), float(pair[1])
+
+
 def _load_input_specs(config: dict) -> list[dict]:
     adapter_name   = config["tool"]["adapter"]
     adapter_config = config["tool"]["adapter_config"]
@@ -102,6 +111,12 @@ def _print_findings(report: dict) -> None:
                                      f"{report['tau_raw']:.1f}; {report['tau_source']})")
     else:  # findings saved before tau_raw existed
         t.add_row("Critical (τ)",    f"{report['n_critical']}  (τ = {report['tau']:.1f})")
+    if "lambda1" in report:
+        l1, l2 = report["lambda1"], report["lambda2"]
+        mode = ("pure severity" if l2 == 0.0
+                else "emphasise surprise" if l1 < 0.4
+                else "balanced")
+        t.add_row("Z objective (λ₁, λ₂)", f"{l1}, {l2}  [{mode}]")
     t.add_row("Z̄ (mean surprise)",   f"{report['z_bar']:.3f}")
     t.add_row("Box size",            str(report["n_in_box"]))
     t.add_row("Precision",           f"{report['precision']:.1%}")
@@ -204,6 +219,7 @@ def run(config, db, sweeps, no_ai):
     box_constraints = {}  # grows with each targeted sweep
 
     for sweep_num in range(1, sweeps + 1):
+        l1, l2 = _lambda_for_sweep(cfg, sweep_num)
         # Design sweep
         if sweep_num == 1:
             n = cfg["sampling"]["initial_n"]
@@ -211,7 +227,10 @@ def run(config, db, sweeps, no_ai):
             scenarios  = planner.lhs_sweep(input_specs, n)
             console.print(Panel(
                 f"[bold]Sweep {sweep_num} of {sweeps}[/bold]  —  Initial LHS  (N={n})\n"
-                f"Purpose: establish baseline distribution and element potentials",
+                f"Purpose: establish baseline distribution and element potentials\n"
+                f"Z objective: λ₁={l1}  λ₂={l2}  "
+                + ("(pure severity — find full critical region)" if l2 == 0.0
+                   else "(balanced severity + surprise)"),
                 style="blue",
             ))
         else:
@@ -220,7 +239,11 @@ def run(config, db, sweeps, no_ai):
             scenarios  = planner.targeted_sweep(input_specs, box_constraints, n)
             console.print(Panel(
                 f"[bold]Sweep {sweep_num} of {sweeps}[/bold]  —  Targeted follow-up  (N={n})\n"
-                f"Focus: {len(box_constraints)} constrained parameter(s)",
+                f"Focus: {len(box_constraints)} constrained parameter(s)\n"
+                f"Z objective: λ₁={l1}  λ₂={l2}  "
+                + ("(pure severity)" if l2 == 0.0
+                   else "(emphasise surprise)" if l1 < 0.4
+                   else "(balanced severity + surprise)"),
                 style="blue",
             ))
 
@@ -238,7 +261,8 @@ def run(config, db, sweeps, no_ai):
         # Analyze
         console.print("\n[cyan]Analyzing...[/cyan]")
         report = analyzer.analyze(sweep_id, db, cfg,
-                                   use_all_data=(sweep_num > 1))
+                                   use_all_data=(sweep_num > 1),
+                                   lambda1=l1, lambda2=l2)
         if "error" in report:
             console.print(f"[red]Analysis error:[/red] {report['error']}")
             continue

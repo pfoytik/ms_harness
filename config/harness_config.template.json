@@ -71,6 +71,8 @@
     "sweep_budget": 1000,
     "min_box_support": 30,
     "alpha": 0.05,
-    "followup_fraction": 0.4
+    "followup_fraction": 0.4,
+    "_comment_lambda": "lambda_schedule: [lambda1, lambda2] pair per sweep. lambda1=1.0/lambda2=0.0 = pure severity (standard PRIM, finds full critical region). lambda1=0.5/lambda2=1.0 = balanced. lambda1=0.25/lambda2=1.5 = emphasise surprise. The last entry repeats for any extra sweeps.",
+    "lambda_schedule": [[1.0, 0.0], [0.5, 1.0], [0.25, 1.5]]
   }
 }

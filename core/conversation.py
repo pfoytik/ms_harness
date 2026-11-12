@@ -295,11 +295,17 @@ def _report_block(report: dict, n_top: int = 5) -> str:
             "lower": None if b["lower"] is None else round(b["lower"], 3),
             "upper": None if b["upper"] is None else round(b["upper"], 3)}
            for b in report.get("box", [])]
-    br = report["bias_ratio"]
+    br  = report["bias_ratio"]
+    l1  = report.get("lambda1", 0.5)
+    l2  = report.get("lambda2", 1.0)
+    mode = ("pure severity — PRIM maximised bad outcomes regardless of SP" if l2 == 0.0
+            else "emphasise surprise — PRIM strongly penalised high-SP scenarios" if l1 < 0.4
+            else "balanced severity + surprise")
     return f"""FINDINGS REPORT (sweep {report.get('sweep_id')})
 - Scenarios analyzed: {report['n_scenarios']}
 - Critical scenarios: {report['n_critical']} ({_critical_rule(report)})
 - Element potential used for surprise scoring: {report.get('potential_type')}
+- Z objective: λ₁={l1}, λ₂={l2} ({mode})
 - Bias ratio: {br if br == float('inf') else round(br, 3)} (< 1 = discovered critical scenarios skew toward low-potential, i.e. surprising, ones)
 - Completeness index: {report['completeness_index']:.3f}
 - PRIM box: {report['n_in_box']} scenarios, precision {report['precision']:.1%} (fraction critical inside the box)

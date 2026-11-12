@@ -45,6 +45,7 @@
     "sweep_budget": 1000,
     "min_box_support": 30,
     "alpha": 0.05,
-    "followup_fraction": 0.4
+    "followup_fraction": 0.4,
+    "lambda_schedule": [[1.0, 0.0], [0.5, 1.0], [0.25, 1.5]]
   }
 }

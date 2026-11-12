@@ -241,9 +241,15 @@ def _completeness_index(disc: np.ndarray, crit: np.ndarray,
 # ── Main analysis entry point ─────────────────────────────────────────────────
 
 def analyze(sweep_id: int, db_path: str, config: dict,
-             use_all_data: bool = False) -> dict:
+             use_all_data: bool = False,
+             lambda1: float = 0.5, lambda2: float = 1.0) -> dict:
     """
     Run PRIM analysis with surprise scoring on a completed sweep.
+
+    lambda1 / lambda2 control the Z-score objective:
+      lambda1=1.0, lambda2=0.0  →  pure severity (standard PRIM)
+      lambda1=0.5, lambda2=1.0  →  balanced severity + surprise (default)
+      lambda1=0.25, lambda2=1.5 →  emphasise surprise within critical region
 
     Returns a findings report dict suitable for display and DB storage.
     """
@@ -323,7 +329,7 @@ def analyze(sweep_id: int, db_path: str, config: dict,
     critical_mask = y >= tau
 
     # Z scores
-    Z, t_norm, sp_norm = _surprise_scores(y, sp_vals)
+    Z, t_norm, sp_norm = _surprise_scores(y, sp_vals, lambda1=lambda1, lambda2=lambda2)
 
     # PRIM
     box, meta = _prim(X, Z, params_set, alpha=alpha, n_min=n_min)
@@ -384,4 +390,6 @@ def analyze(sweep_id: int, db_path: str, config: dict,
         "top_surprising":     top_scenarios,
         "metric":             metric,
         "direction":          direction,
+        "lambda1":            lambda1,
+        "lambda2":            lambda2,
     }
