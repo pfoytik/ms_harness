@@ -1,11 +1,11 @@
 {
   "project": {
-    "name": "Attack Ladder Demo — net_28",
+    "name": "Bayesian Attack Network Demo — net_28",
     "created": "2026-11-11",
-    "description": "Surprise-driven critical scenario discovery for a cyber-physical attack ladder Bayesian network"
+    "description": "Surprise-driven critical scenario discovery for a cyber-physical Bayesian attack network"
   },
   "tool": {
-    "name": "Attack Ladder Bayesian Network Sampler",
+    "name": "Bayesian Attack Network Sampler",
     "version": "1.0",
     "domain": "cybersecurity resilience",
     "description": "Monte Carlo sampling of a Bayesian network representing attack paths through a cyber-physical system. Each node is an attack step; edge probabilities determine how likely an attacker traverses each path. Overall System Resilience measures the fraction of runs where the attacker fails to reach any exit node.",

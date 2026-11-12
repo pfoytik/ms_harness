@@ -338,9 +338,9 @@ ORDER BY CAST(parameter AS INTEGER);
 
 ---
 
-## Demo: Attack Ladder Bayesian Network
+## Demo: Bayesian Attack Network
 
-The included `tools/bayes_sampler/` adapter connects to the attack ladder Bayesian network sampler from the `bayes_sampler` project. It was used to validate the PRIM methodology across 30 randomly generated attack networks.
+The included `tools/bayes_sampler/` adapter connects to the Bayesian attack network sampler from the `bayes_sampler` project. It was used to validate the PRIM methodology across 30 randomly generated attack networks.
 
 **What it simulates:** Monte Carlo sampling of a Bayesian network where each node is an attack step and edge probabilities govern how likely an attacker traverses each path. `Overall System Resilience` measures the fraction of runs where no exit node was reached.
 
@@ -356,9 +356,11 @@ An attacker therefore needs a foothold before progressing, and the network topol
 
 A useful consequence: an exit can never be compromised with probability above its own weight, so resilience is bounded below by `100 × Π(1 − w_exit)`. A scenario can only be critical if that floor is below the threshold. To study upstream effects, hold the exit weights in a band where the floor straddles the threshold.
 
-**Sampler versions:** `run_model.sh` detects whether `headless_sampler.js` takes the extra MITRE attack-group argument (newer versions) and passes the right number of placeholder arguments.
+**Bundled sampler:** the adapter includes the Bayesian attack network sampler and network generator in `tools/bayes_sampler/sampler/`, developed by Ross Gore (see [Acknowledgments](#acknowledgments) and the README in that folder). If `adapter_config.sampler_path` is omitted or empty, `run_model.sh` uses the bundled `headless_sampler.js`. Set it only to use a different sampler build. Node.js is required. `run_model.sh` also detects whether a sampler takes the extra MITRE attack-group argument (newer versions) and passes the right number of placeholder arguments.
 
-**Pre-configured for:** `net_28` (baseline resilience ~26%). Set `sampler_path` and `network_template` in `adapter_config` for your machine, ideally in a `harness_config.local.json`. Test networks can be generated with the attack ladder project's `netGen.py --function createRandAG`. Its exit count is random, so screen generated networks for a small number of exits: a network with many exits gives near-0% resilience almost everywhere and leaves nothing to analyze.
+**Paths in `adapter_config`:** relative paths that exist under the repository root (e.g. `tools/bayes_sampler/nets/net_local_02.json`) are resolved against it, so configs work from any working directory.
+
+**Pre-configured for:** `net_28` (baseline resilience ~26%). net_28 itself is not included: point `network_template` at your copy, ideally in a `harness_config.local.json`. A bundled example network, `tools/bayes_sampler/nets/net_local_02.json`, is the one used in [the SME-context case study](docs/case_study_sme_context_bayes_sampler.md). New test networks can be generated with the bundled `sampler/netGen.py --function createRandAG`. Its exit count is random, so screen generated networks for a small number of exits: a network with many exits gives near-0% resilience almost everywhere and leaves nothing to analyze.
 
 **Run the demo:**
 
@@ -409,15 +411,27 @@ ms_harness/
 │   ├── runner.py           Batch execution with progress display
 │   ├── analyzer.py         PRIM analysis and metrics
 │   └── conversation.py     Claude API via httpx, AI preamble, manual mode
+├── docs/
+│   ├── related_work_and_gap.md
+│   ├── case_study_sme_context_bayes_sampler.md   SME-context case study
+│   └── case_study_data/    Case-study config, scenario CSV, AI prompts, analysis script
 ├── db/
 │   ├── schema.sql          Database schema
 │   └── *.db                Campaign DBs (git-ignored)
 ├── ai_exchange/            Manual-mode prompts/replies (git-ignored)
 └── tools/
     └── bayes_sampler/      Demo adapter — Bayesian network sampler
+        ├── sampler/            Bundled sampler (headless_sampler.js) and netGen.py
+        ├── nets/               Example networks (net_local_02.json)
         ├── harness_config.json
         ├── harness_config.local.json   Machine-specific copy (git-ignored)
         ├── input_processor.py
         ├── output_processor.py
         └── run_model.sh
 ```
+
+---
+
+## Acknowledgments
+
+The Bayesian attack network sampler (`headless_sampler.js`) and network generator (`netGen.py`) bundled in `tools/bayes_sampler/sampler/` were developed by **Ross Gore**, co-author and colleague on this work.

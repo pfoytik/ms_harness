@@ -117,6 +117,17 @@ def load_sweep_data(db_path: str, sweep_id: int) -> tuple[list[dict], list[dict]
     return [dict(r) for r in inputs], [dict(r) for r in outputs]
 
 
+def first_lhs_sweep_id(db_path: str) -> int | None:
+    """Earliest completed LHS sweep — the unbiased baseline for the critical threshold."""
+    conn = _connect(db_path)
+    row = conn.execute(
+        "SELECT sweep_id FROM sweeps WHERE sweep_type='lhs' AND status='complete' "
+        "ORDER BY sweep_id LIMIT 1"
+    ).fetchone()
+    conn.close()
+    return row[0] if row else None
+
+
 def load_all_data(db_path: str) -> tuple[list[dict], list[dict]]:
     """Return all complete scenario inputs and outputs across all sweeps."""
     conn = _connect(db_path)
@@ -144,6 +155,18 @@ def save_finding(db_path: str, sweep_id: int, report: dict) -> int:
     conn.commit()
     conn.close()
     return fid
+
+
+def save_ai_output(db_path: str, sweep_id: int, kind: str, content: str) -> int:
+    conn = _connect(db_path)
+    cur = conn.execute(
+        "INSERT INTO ai_outputs (sweep_id, kind, content, created_at) VALUES (?,?,?,?)",
+        (sweep_id, kind, content, _now()),
+    )
+    oid = cur.lastrowid
+    conn.commit()
+    conn.close()
+    return oid
 
 
 def load_latest_finding(db_path: str) -> dict | None:

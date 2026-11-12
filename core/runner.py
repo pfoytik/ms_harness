@@ -34,7 +34,7 @@ def run_batch(config: dict, scenarios: list[dict], sweep_id: int, db_path: str) 
     """
     adapter_name   = config["tool"]["adapter"]
     adapter_config = config["tool"]["adapter_config"]
-    sampler_path   = adapter_config["sampler_path"]
+    sampler_path   = adapter_config.get("sampler_path", "")  # "" = adapter default
     n_samples      = adapter_config.get("n_samples_per_run", 1000)
 
     tools_dir  = Path(__file__).parent.parent / "tools" / adapter_name
@@ -88,7 +88,7 @@ def smoke_test(config: dict) -> dict:
     """
     adapter_name   = config["tool"]["adapter"]
     adapter_config = config["tool"]["adapter_config"]
-    sampler_path   = adapter_config["sampler_path"]
+    sampler_path   = adapter_config.get("sampler_path", "")  # "" = adapter default
     n_samples      = adapter_config.get("n_samples_per_run", 1000)
 
     tools_dir  = Path(__file__).parent.parent / "tools" / adapter_name

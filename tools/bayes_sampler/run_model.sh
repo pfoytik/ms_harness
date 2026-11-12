@@ -1,14 +1,20 @@
 #!/usr/bin/env bash
-# Attack Ladder model executor
-# Usage: run_model.sh <input_network_json> <scenario_id> <output_dir> <sampler_path> <n_samples>
+# Bayesian attack network model executor
+# Usage: run_model.sh <input_network_json> <scenario_id> <output_dir> [sampler_path] [n_samples]
+# An empty sampler_path uses the bundled sampler/headless_sampler.js
 
 set -euo pipefail
 
 INPUT_JSON="$1"
 SCENARIO_ID="$2"
 OUTPUT_DIR="$3"
-SAMPLER_PATH="$4"
+SAMPLER_PATH="${4:-}"
 N_SAMPLES="${5:-1000}"
+
+# Default to the sampler bundled with this adapter
+if [ -z "$SAMPLER_PATH" ]; then
+    SAMPLER_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/sampler/headless_sampler.js"
+fi
 
 mkdir -p "$OUTPUT_DIR"
 

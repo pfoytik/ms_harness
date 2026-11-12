@@ -1,5 +1,5 @@
 """
-Attack Ladder input processor.
+Bayesian attack network input processor.
 
 Takes a scenario dict {node_id_str: weight} and the adapter_config,
 injects weights into the network JSON CPT structure, and returns the

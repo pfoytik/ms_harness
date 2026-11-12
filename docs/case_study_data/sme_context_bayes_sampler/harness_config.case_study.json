@@ -1,0 +1,55 @@
+{
+  "project": {
+    "name": "Case study — SME context on net_local_02",
+    "created": "2026-11-11",
+    "description": "Reproduction config for docs/case_study_sme_context_bayes_sampler.md"
+  },
+  "tool": {
+    "name": "Bayesian Attack Network Sampler",
+    "version": "1.0",
+    "domain": "cybersecurity resilience",
+    "description": "Monte Carlo sampling of a Bayesian network representing attack paths through a cyber-physical system. Each node is an attack step; edge probabilities determine how likely an attacker traverses each path. Overall System Resilience measures the fraction of runs where the attacker fails to reach any exit node.",
+    "adapter": "bayes_sampler",
+    "adapter_config": {
+      "network_template": "tools/bayes_sampler/nets/net_local_02.json",
+      "n_samples_per_run": 1000
+    }
+  },
+  "inputs": {
+    "discovery": "dynamic",
+    "description": "Node yes-probabilities discovered from network_template at runtime",
+    "range": [
+      0.01,
+      0.99
+    ],
+    "nominal": 0.5,
+    "sme_notes": "Entry nodes (low topological depth) are easier to compromise. Exit nodes are primary bottlenecks — their compromise guarantees attacker success. Surprising failures involve mid-graph lateral movement nodes elevated just above baseline while keeping exit-node weights low."
+  },
+  "outputs": [
+    {
+      "id": "overall_system_resilience",
+      "description": "Percentage of Monte Carlo runs where no exit node was compromised (0=attacker always wins, 100=defender always wins)",
+      "type": "float",
+      "range": [
+        0,
+        100
+      ],
+      "higher_is_better": true
+    }
+  ],
+  "objective": {
+    "critical_metric": "overall_system_resilience",
+    "critical_direction": "below",
+    "critical_threshold_quantile": 0.5,
+    "surprise_definition": "Critical attacker success (low resilience) achieved when most nodes have LOW compromise probability — the attacker succeeds via structurally unimportant paths without needing to target the primary high-impact bottleneck nodes",
+    "element_potential": "paths_to_exit",
+    "sme_context": "Large degredation or high probability of failure  of segments that are closer to end nodes are more likely to cause critical scenarios."
+  },
+  "sampling": {
+    "initial_n": 200,
+    "sweep_budget": 1000,
+    "min_box_support": 30,
+    "alpha": 0.05,
+    "followup_fraction": 0.4
+  }
+}

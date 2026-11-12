@@ -47,9 +47,19 @@ BANNER = """[bold cyan]
 ╚══════════════════════════════════════════════════╝[/bold cyan]"""
 
 
+REPO_ROOT = Path(__file__).parent
+
+
 def _load_config(config_path: str) -> dict:
+    """Load a config; relative paths in adapter_config that exist under the
+    repo root are made absolute, so runs don't depend on the current directory."""
     with open(config_path) as f:
-        return json.load(f)
+        cfg = json.load(f)
+    ac = cfg.get("tool", {}).get("adapter_config", {})
+    for key, val in ac.items():
+        if isinstance(val, str) and val and not os.path.isabs(val) and (REPO_ROOT / val).exists():
+            ac[key] = str(REPO_ROOT / val)
+    return cfg
 
 
 DB_DIR = Path(__file__).parent / "db"

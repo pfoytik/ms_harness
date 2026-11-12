@@ -1,5 +1,5 @@
 """
-Attack Ladder output processor.
+Bayesian attack network output processor.
 
 Reads summary_<scenario_id>.json written by headless_sampler.js and
 returns a standardised metrics dict for the harness DB.
