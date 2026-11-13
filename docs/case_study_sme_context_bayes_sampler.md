@@ -71,7 +71,11 @@ Rung structure, by distance to the nearest exit:
 | 3 (mid-ladder rung) | 10–13 | **4** |
 | 4 (entry rung) | 1–9 | 9 |
 
-Every attack path crosses the 4-node mid-ladder rung. The `paths_to_exit` element potential ranks nodes 10 (0.068) and 12 (0.062) as the most important nodes after the exits.
+![Structure of net_local_02: nodes in columns by distance to the nearest exit, from the entry rung on the left to exits 33 and 34 on the right](case_study_data/sme_context_bayes_sampler/network_structure.png)
+
+*Figure: `net_local_02` laid out by distance to the nearest exit. Regenerate with `python docs/case_study_data/sme_context_bayes_sampler/plot_network.py`.*
+
+Every attack path from entry nodes 1–9 crosses the 4-node mid-ladder rung. The one exception is entry node 32, which has no parents and links directly to exit 33 (dashed edge). The `paths_to_exit` element potential ranks nodes 10 (0.068) and 12 (0.062) as the most important nodes after the exits.
 
 ### SME context
 
@@ -314,6 +318,7 @@ Case-study material is in [`case_study_data/sme_context_bayes_sampler/`](case_st
 | `scenarios.csv` | Campaign 1 scenarios: sweep, scenario ID, 34 input weights, resilience (1000 scenarios) |
 | `ai_prompts/` | Campaign 1 AI exchanges (request/response 007–011) |
 | `analyze_case_study.py` | Recomputes the Campaign 1 rung-level tables; accepts `--db` for a new run |
+| `plot_network.py` / `network_structure.png` | Draws the network-structure figure from the network JSON (needs matplotlib) |
 
 ### Re-run Campaign 2 (lambda schedule)
 
