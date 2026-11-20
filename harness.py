@@ -194,7 +194,8 @@ def cli():
 @click.option("--sweeps", default=3,     show_default=True,
               help="Maximum number of sweeps to run")
 @click.option("--no-ai",  is_flag=True,  help="Skip AI interpretation (run analysis only)")
-def run(config, db, sweeps, no_ai):
+@click.option("--yes",    is_flag=True,  help="Skip all confirmation prompts (fully autonomous)")
+def run(config, db, sweeps, no_ai, yes):
     """Run a sweep campaign: LHS → analyze → targeted follow-up loop."""
     db = _resolve_db(db)
     console.print(BANNER)
@@ -247,7 +248,7 @@ def run(config, db, sweeps, no_ai):
                 style="blue",
             ))
 
-        if not Confirm.ask("Proceed?", default=True):
+        if not yes and not Confirm.ask("Proceed?", default=True):
             console.print("[yellow]Sweep skipped.[/yellow]")
             continue
 
@@ -290,7 +291,7 @@ def run(config, db, sweeps, no_ai):
 
         if sweep_num < sweeps:
             console.print()
-            if not Confirm.ask("Continue to next sweep?", default=True):
+            if not yes and not Confirm.ask("Continue to next sweep?", default=True):
                 break
 
     console.print("\n[bold green]Campaign complete.[/bold green]  "

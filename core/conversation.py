@@ -16,7 +16,8 @@ from pathlib import Path
 import httpx
 
 ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
-DEFAULT_MODEL     = "claude-sonnet-4-6"
+OPENAI_API_URL    = "https://api.ppq.ai/v1/chat/completions"
+DEFAULT_MODEL     = os.environ.get("HARNESS_MODEL", "claude-sonnet-4-6")
 
 
 def _manual_mode() -> bool:
@@ -68,26 +69,40 @@ def _call_claude(messages: list, system: str = None, model: str = DEFAULT_MODEL)
     if not api_key:
         raise EnvironmentError("ANTHROPIC_API_KEY not set")
 
-    payload = {
-        "model": model,
-        "max_tokens": 4096,
-        "messages": messages,
-    }
-    if system:
-        payload["system"] = system
+    openai_format = os.environ.get("HARNESS_API_FORMAT", "anthropic").lower() == "openai"
 
-    resp = httpx.post(
-        ANTHROPIC_API_URL,
-        headers={
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-        },
-        json=payload,
-        timeout=90,
-    )
-    resp.raise_for_status()
-    return resp.json()["content"][0]["text"]
+    if openai_format:
+        url = os.environ.get("HARNESS_API_URL", OPENAI_API_URL)
+        if system:
+            msgs = [{"role": "system", "content": system}] + messages
+        else:
+            msgs = messages
+        payload = {"model": model, "max_tokens": 4096, "messages": msgs}
+        resp = httpx.post(
+            url,
+            headers={"Authorization": f"Bearer {api_key}", "content-type": "application/json"},
+            json=payload,
+            timeout=90,
+        )
+        resp.raise_for_status()
+        return resp.json()["choices"][0]["message"]["content"]
+    else:
+        url = os.environ.get("HARNESS_API_URL", ANTHROPIC_API_URL)
+        payload = {"model": model, "max_tokens": 4096, "messages": messages}
+        if system:
+            payload["system"] = system
+        resp = httpx.post(
+            url,
+            headers={
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            json=payload,
+            timeout=90,
+        )
+        resp.raise_for_status()
+        return resp.json()["content"][0]["text"]
 
 
 # ── Onboarding ────────────────────────────────────────────────────────────────

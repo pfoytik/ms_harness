@@ -54,11 +54,22 @@ pip install -r requirements.txt
 
 ### 2. Set up the AI layer (optional)
 
-**With an API key:**
+**Anthropic API (direct):**
 
 ```bash
-export ANTHROPIC_API_KEY=your_key_here
+export ANTHROPIC_API_KEY=sk-ant-...
 ```
+
+**Third-party provider (OpenAI-compatible, e.g. ppq.ai):**
+
+```bash
+export ANTHROPIC_API_KEY=sk-ppq-...      # your provider's key
+export HARNESS_API_FORMAT=openai          # switches to OpenAI-compatible request/response format
+export HARNESS_API_URL=https://api.ppq.ai/v1/chat/completions   # provider endpoint (default shown)
+export HARNESS_MODEL=claude-sonnet-4-6   # any model name your provider accepts
+```
+
+`HARNESS_API_URL` defaults to `https://api.ppq.ai/v1/chat/completions` when `HARNESS_API_FORMAT=openai` is set, so it only needs to be set if your provider uses a different endpoint. `HARNESS_MODEL` defaults to `claude-sonnet-4-6` regardless of format.
 
 **Without an API key (manual mode):** you or an assistant can play the AI role by hand:
 
@@ -125,6 +136,17 @@ Opens a free-form conversation with Claude about the latest analysis results, us
 | `--db`     | required | SQLite DB (created if absent); a bare filename is stored in `db/` |
 | `--sweeps` | 3 | Maximum number of sweeps |
 | `--no-ai`  | false | Skip AI interpretation, run analysis only |
+| `--yes`    | false | Skip all "Proceed?" and "Continue?" confirmation prompts — runs fully autonomously end to end |
+
+**Fully autonomous example** (API key set, no human input required):
+
+```bash
+python harness.py run \
+  --config tools/bayes_sampler/harness_config.json \
+  --db auto_run.db \
+  --sweeps 3 \
+  --yes
+```
 
 ---
 
@@ -302,6 +324,19 @@ The harness calls this script via `bash run_model.sh ...` and expects exit code 
 Start from `config/harness_config.template.json`, which documents every field, or copy `tools/bayes_sampler/harness_config.json`. Update the `tool`, `objective`, and `sampling` sections for your domain, and set `"adapter": "my_tool"`.
 
 **Machine-specific configs:** name them `*.local.json` (e.g. `harness_config.local.json`). That pattern is git-ignored, so local tool and data paths stay out of the repository.
+
+---
+
+## Environment Variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | — | API key for Anthropic or a compatible provider |
+| `HARNESS_AI_MODE` | `api` | Set to `manual` to use file-based human/agent exchange instead of an API call |
+| `HARNESS_API_FORMAT` | `anthropic` | Set to `openai` for OpenAI-compatible providers (ppq.ai, etc.) |
+| `HARNESS_API_URL` | Anthropic or ppq.ai endpoint (see above) | Override the API endpoint URL |
+| `HARNESS_MODEL` | `claude-sonnet-4-6` | Model name passed to the API |
+| `HARNESS_AI_EXCHANGE_DIR` | `ai_exchange` | Directory for manual-mode request/response files |
 
 ---
 
